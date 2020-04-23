@@ -1,2 +1,2 @@
-Step 1: Download Pre-Trained Pedesterian model
+Step 1: Download Pre-Trained Pedesterian model.
         python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name pedestrian-detection-adas-0002 -o models/ --precisions FP16
