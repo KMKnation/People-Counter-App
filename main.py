@@ -48,9 +48,9 @@ def build_argparser():
     :return: command line arguments
     """
     parser = ArgumentParser()
-    parser.add_argument("-m", "--model", required=True, type=str,
+    parser.add_argument("-m", "--model", required=False, type=str,
                         help="Path to an xml file with a trained model.")
-    parser.add_argument("-i", "--input", required=True, type=str,
+    parser.add_argument("-i", "--input", required=False, type=str,
                         help="Path to image or video file")
     parser.add_argument("-l", "--cpu_extension", required=False, type=str,
                         default=None,
@@ -65,6 +65,7 @@ def build_argparser():
     parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
                         help="Probability threshold for detections filtering"
                         "(0.5 by default)")
+
     return parser
 
 
@@ -87,9 +88,14 @@ def infer_on_stream(args, client):
     # Initialise the class
     infer_network = Network()
     # Set Probability threshold for detections
-    prob_threshold = args.prob_threshold
+    if not args.prob_threshold is None:
+        prob_threshold = args.prob_threshold
+    else:
+        prob_threshold = 0.4
 
     ### TODO: Load the model through `infer_network` ###
+    model = infer_network.load_model(args.model, args.cpu_extension, args.device)
+    print("Model Loaded Successfully")
 
     ### TODO: Handle the input stream ###
 
@@ -132,4 +138,5 @@ def main():
 
 
 if __name__ == '__main__':
+    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -d CPU
     main()

@@ -36,15 +36,32 @@ class Network:
 
     def __init__(self):
         ### TODO: Initialize any class variables desired ###
-        print("Init Method")
+        self.core = None
+        self.network = None
 
-    def load_model(self):
+    def load_model(self, model_xml, extension, device):
+        '''
+        @model_xml XML file of IR
+        @extension EXTENSION linker library *.so supported by system such as Linux, Max etc
+        @device Platform CPU/GPU
+        '''
         ### TODO: Load the model ###
+        # self.network = IENetwork(model=model_xml, weights=os.path.splitext(model_xml)[0] + ".bin") #removed because got deprecated warning
+        self.core = IECore()
+        self.network = self.core.read_network(model=str(model_xml), weights=str(os.path.splitext(model_xml)[0] + ".bin"))
+
         ### TODO: Check for supported layers ###
+        supported_layers = self.core.query_network(network=self.network, device_name="CPU")
+        unsupported_layers = [layer for layer in self.network.layers.keys() if layer not in supported_layers]
+        if len(unsupported_layers) > 0:
+            print("Please check extention for these unsupported layers =>" + str(unsupported_layers))
+            exit(1)
         ### TODO: Add any necessary extensions ###
+        if extension is not None:
+            self.core.add_extension(extension, device)
         ### TODO: Return the loaded inference plugin ###
         ### Note: You may need to update the function parameters. ###
-        return
+        return self.core
 
     def get_input_shape(self):
         ### TODO: Return the shape of the input layer ###

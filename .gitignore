@@ -3,3 +3,4 @@
 __pycache__/
 webservice/server/package-lock.json
 webservice/ui/package-lock.json
+/models/
