@@ -26,7 +26,7 @@ import time
 import socket
 import json
 import cv2
-
+from imutils.video import FPS
 import logging as log
 import paho.mqtt.client as mqtt
 
@@ -76,6 +76,14 @@ def connect_mqtt():
     return client
 
 
+def pre_process(frame, net_input_shape):
+    p_frame = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
+    p_frame = p_frame.transpose(2, 0, 1)
+    # p_frame = np.expand_dims(p_frame, axis=1)
+    p_frame = p_frame.reshape(1, *p_frame.shape)
+    return p_frame
+
+
 def infer_on_stream(args, client):
     """
     Initialize the inference network, stream video to network,
@@ -86,7 +94,7 @@ def infer_on_stream(args, client):
     :return: None
     """
     # Initialise the class
-    infer_network = Network()
+    network = Network()
     # Set Probability threshold for detections
     if not args.prob_threshold is None:
         prob_threshold = args.prob_threshold
@@ -94,24 +102,32 @@ def infer_on_stream(args, client):
         prob_threshold = 0.4
 
     ### TODO: Load the model through `infer_network` ###
-    model = infer_network.load_model(args.model, args.cpu_extension, args.device)
-    print("Model Loaded Successfully")
+    network.load_model(args.model, args.cpu_extension, args.device)
+    pedestrian_input_shape = network.get_input_shape()
+    print("Model Loaded Successfully ")
 
     ### TODO: Handle the input stream ###
-
+    cap = cv2.VideoCapture(args.input)
+    fps = FPS().start()
     ### TODO: Loop until stream is over ###
-
+    while(cap.isOpened()):
         ### TODO: Read from the video capture ###
-
+        isAnyFrameLeft, frame = cap.read()
+        width = int(cap.get(3))
+        height = int(cap.get(4))
         ### TODO: Pre-process the image as needed ###
-
+        if not isAnyFrameLeft:
+            break
+        processed_frame = pre_process(frame, net_input_shape=pedestrian_input_shape)
         ### TODO: Start asynchronous inference for specified request ###
-
+        network.exec_net(processed_frame)
         ### TODO: Wait for the result ###
-
+        if network.wait() == 0:
             ### TODO: Get the results of the inference request ###
+            result = network.get_all_output()
 
             ### TODO: Extract any desired stats from the results ###
+            print(result)
 
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
