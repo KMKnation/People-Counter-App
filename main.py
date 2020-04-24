@@ -1,4 +1,6 @@
 """People Counter."""
+import imutils
+
 """
  Copyright (c) 2018 Intel Corporation.
  Permission is hereby granted, free of charge, to any person obtaining
@@ -19,7 +21,6 @@
  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-
 import os
 import sys
 import time
@@ -27,6 +28,7 @@ import socket
 import json
 import cv2
 from imutils.video import FPS
+from datetime import datetime
 import logging as log
 import paho.mqtt.client as mqtt
 
@@ -64,7 +66,7 @@ def build_argparser():
                              "specified (CPU by default)")
     parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
                         help="Probability threshold for detections filtering"
-                        "(0.5 by default)")
+                             "(0.5 by default)")
 
     return parser
 
@@ -82,6 +84,14 @@ def pre_process(frame, net_input_shape):
     # p_frame = np.expand_dims(p_frame, axis=1)
     p_frame = p_frame.reshape(1, *p_frame.shape)
     return p_frame
+
+
+def imshow(name, frame):
+    cv2.imshow('output', imutils.resize(frame, width=900))
+
+
+def filter_out_same_person_detecions(output):
+    print(output.shape)
 
 
 def infer_on_stream(args, client):
@@ -110,7 +120,10 @@ def infer_on_stream(args, client):
     cap = cv2.VideoCapture(args.input)
     fps = FPS().start()
     ### TODO: Loop until stream is over ###
-    while(cap.isOpened()):
+
+    total_people = 0
+    last_detection_time = None
+    while (cap.isOpened()):
         ### TODO: Read from the video capture ###
         isAnyFrameLeft, frame = cap.read()
         width = int(cap.get(3))
@@ -122,12 +135,97 @@ def infer_on_stream(args, client):
         ### TODO: Start asynchronous inference for specified request ###
         network.exec_net(processed_frame)
         ### TODO: Wait for the result ###
+        last_x_min = 0
+        last_x_max = 0
+        last_y_max = 0
+        last_y_min = 0
         if network.wait() == 0:
             ### TODO: Get the results of the inference request ###
             result = network.get_all_output()
 
             ### TODO: Extract any desired stats from the results ###
-            print(result)
+            output = result['detection_out']
+            counter = 0
+            for detection in output[0][0]:
+                image_id, label, conf, x_min, y_min, x_max, y_max = detection
+
+                # print(str(label))
+                if conf > 0.7:
+                    x_min = int(x_min * width)
+                    x_max = int(x_max * width)
+                    y_min = int(y_min * height)
+                    y_max = int(y_max * height)
+
+                    x_min_diff = last_x_min - x_min
+                    x_max_diff = last_x_max - x_max
+
+                    if x_min_diff  > 0 and x_max_diff > 0: #ignore multiple drawn bounding boxes
+                        # cv2.waitKey(0)
+                        continue
+
+                    y_min_diff = abs(last_y_min) - abs(y_min)
+                    y_max_diff = abs(last_y_max) - abs(y_max)
+
+
+                    counter = counter + 1
+                    # print("X  => " + str(x_min_diff) + " " + str(x_max_diff) + " label" + str(label))
+                    # print(" label" + str(label))
+                    # print("Y  => " + str(y_min_diff) + " " + str(y_max_diff))
+
+                    # print(str(y_min_diff)+ " " + str(y_max_diff))
+                    last_x_min = x_min
+                    last_x_max = x_max
+                    last_y_max = y_max
+                    last_y_min = y_min
+
+                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+
+                    activity = ""
+                    if (abs(y_min_diff) <= 20):
+                        activity = "stayed"
+                    else:
+                        activity = "Walking"
+
+                    cv2.putText(frame, activity, (x_min, y_min), cv2.FONT_HERSHEY_PLAIN, 1, (255, 50, 50),
+                                lineType=cv2.LINE_4, thickness=2)
+
+                    last_detection_time = datetime.now()
+                    # print(total_detected)
+
+
+                totalPerson = "Crowd Count: " + str(counter)
+                cv2.putText(frame, totalPerson, (int(width / 4), 100), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 20, 80),
+                            lineType=cv2.LINE_8, thickness=2)
+
+                cv2.putText(frame, "Totol : "+str(total_people),(100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (250, 50, 250),
+                            lineType=cv2.LINE_4, thickness=2)
+
+                if last_detection_time is not None:
+                    # if last_detection_time.minute
+                    second_diff = (datetime.now() - last_detection_time).total_seconds()
+                    print(second_diff)
+                    if second_diff >= 1:
+                        print(second_diff)
+                        total_people += counter
+                        last_detection_time = None
+
+
+        # # print(total_detected)
+        #     if last_detection_time is not None:
+        #         # if last_detection_time.minute
+        #         second_diff = (datetime.now() - last_detection_time).total_seconds()
+        #         if second_diff >= 1:
+        #             # print(second_diff)
+        #             total_people += totalPerson
+        #             last_detection_time = None
+
+
+
+
+        imshow("frame", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
