@@ -268,16 +268,15 @@ def infer_on_stream(args, client):
             client.publish("person/duration", json.dumps({"duration": "00:00"}))
 
 
-        imshow("frame", displayFrame)
-        sys.stdout.buffer.write(displayFrame)
-        sys.stdout.flush()
+            # imshow("frame", displayFrame)
+            sys.stdout.buffer.write(displayFrame)
 
         ### TODO: Send the frame to the FFMPEG server ###
 
         ### TODO: Write an output image if `single_image_mode` ###
 
-
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            sys.stdout.flush()
             break
 
 
@@ -303,5 +302,7 @@ if __name__ == '__main__':
     # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -d CPU
     # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
     # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU
-
+    # ffmpeg -f lavfi -i color=c=black:s=1280x720 -vframes 1 black.png
+    # ffmpeg -f lavfi -i color=c=black:s=1280x720 -vframes 1 black.png
+    # ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -vframes -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
     main()

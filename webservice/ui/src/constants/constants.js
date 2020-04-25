@@ -15,7 +15,8 @@ export const LABELS = {
 };
 
 export const HTTP = {
-  CAMERA_FEED: `${SETTINGS.CAMERA_FEED_SERVER}/facstream.mjpeg`, // POST
+//  CAMERA_FEED: `${SETTINGS.CAMERA_FEED_SERVER}/facstream.mjpeg`, // POST
+  CAMERA_FEED: `http://0.0.0.0:3004/facstream.mjpeg`, // POST
 };
 
 export const MQTT = {
