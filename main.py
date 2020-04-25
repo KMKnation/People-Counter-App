@@ -77,8 +77,8 @@ def build_argparser():
 
 def connect_mqtt():
     ### TODO: Connect to the MQTT client ###
-    client = None
-
+    client = mqtt.Client()
+    client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
     return client
 
 
@@ -156,7 +156,6 @@ def infer_on_stream(args, client):
     fps = FPS().start()
     ### TODO: Loop until stream is over ###
 
-    total_people = 0
     last_detection_time = None
     total_unique_persons = []
     while (cap.isOpened()):
@@ -171,6 +170,7 @@ def infer_on_stream(args, client):
 
         processed_frame = pre_process(frame, net_input_shape=pedestrian_input_shape)
         ### TODO: Start asynchronous inference for specified request ###
+        inference_start_time = time.time()
         network.exec_net(processed_frame)
         ### TODO: Wait for the result ###
         last_x_min = 0
@@ -178,6 +178,9 @@ def infer_on_stream(args, client):
         last_y_max = 0
         last_y_min = 0
         if network.wait() == 0:
+            inference_end_time = time.time()
+            total_inference_time = str(inference_end_time - inference_start_time)
+            # print("Inference Time "+ total_inference_time)
             ### TODO: Get the results of the inference request ###
             result = network.get_all_output()
 
@@ -242,12 +245,12 @@ def infer_on_stream(args, client):
                     last_detection_time = datetime.now()
                     # print(total_detected)
 
-
                 totalPerson = "Crowd Count: " + str(counter)
-                cv2.putText(displayFrame, totalPerson, (int(width / 4), 100), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 20, 80),
-                            lineType=cv2.LINE_8, thickness=2)
+                cv2.putText(displayFrame, totalPerson, (50,100), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 20, 80),
+                            lineType=cv2.LINE_4, thickness=2)
 
-                cv2.putText(displayFrame, "Totol : "+str(len(total_unique_persons)),(100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (250, 50, 250),
+                cv2.putText(displayFrame, "Totol : "+str(len(total_unique_persons)),(50,150),
+                            cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
                             lineType=cv2.LINE_4, thickness=2)
 
                 if last_detection_time is not None:
@@ -255,35 +258,28 @@ def infer_on_stream(args, client):
                     second_diff = (datetime.now() - last_detection_time).total_seconds()
                     # print(second_diff)
                     if second_diff >= 1:
-                        total_people += counter
                         last_detection_time = None
-
-
-        # # print(total_detected)
-        #     if last_detection_time is not None:
-        #         # if last_detection_time.minute
-        #         second_diff = (datetime.now() - last_detection_time).total_seconds()
-        #         if second_diff >= 1:
-        #             # print(second_diff)
-        #             total_people += totalPerson
-        #             last_detection_time = None
-
-
-
-
-        imshow("frame", displayFrame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
 
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
+            client.publish("person", json.dumps({"count": str(counter), "total": str(len(total_unique_persons))}))
             ### Topic "person/duration": key of "duration" ###
+            client.publish("person/duration", json.dumps({"duration": "00:00"}))
+
+
+        imshow("frame", displayFrame)
+        sys.stdout.buffer.write(displayFrame)
+        sys.stdout.flush()
 
         ### TODO: Send the frame to the FFMPEG server ###
 
         ### TODO: Write an output image if `single_image_mode` ###
+
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
 
 
 def main():
