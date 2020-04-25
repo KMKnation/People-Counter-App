@@ -34,6 +34,7 @@ import paho.mqtt.client as mqtt
 
 from argparse import ArgumentParser
 from inference import Network
+from sklearn.metrics.pairwise import cosine_similarity
 
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
@@ -43,6 +44,7 @@ MQTT_PORT = 3001
 MQTT_KEEPALIVE_INTERVAL = 60
 
 
+
 def build_argparser():
     """
     Parse command line arguments.
@@ -50,7 +52,9 @@ def build_argparser():
     :return: command line arguments
     """
     parser = ArgumentParser()
-    parser.add_argument("-m", "--model", required=False, type=str,
+    parser.add_argument("-m", "--model", required=True, type=str,
+                        help="Path to an xml file with a trained model.")
+    parser.add_argument("-m2", "--model2", required=True, type=str,
                         help="Path to an xml file with a trained model.")
     parser.add_argument("-i", "--input", required=False, type=str,
                         help="Path to image or video file")
@@ -93,6 +97,33 @@ def imshow(name, frame):
 def filter_out_same_person_detecions(output):
     print(output.shape)
 
+def reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons):
+    idetification_frame = pre_process(crop_person, net_input_shape=identification_input_shape)
+    networkReIdentification.exec_net(idetification_frame)
+    if networkReIdentification.wait() == 0: #256 dimentional unique descriptor
+        ident_output = networkReIdentification.get_output()
+        for i in range(len(ident_output)):
+            if(len(total_unique_persons) == 0):
+                # print(ident_output[i].reshape(1,-1).shape)
+                total_unique_persons.append(ident_output[i].reshape(1,-1))
+            else:
+                # print("Checking SIMILARITY WITH PREVIOUS PEOPLE IF THEY MATCH THEN ALTERTING PERSON COMES SECONF TIME ELSE INCREMENTING TOTAL PEOPLE")
+                newFound = True
+                detected_person = ident_output[i].reshape(1,-1)
+                for index in range(len(total_unique_persons)): #checking that detected person is in out list or not
+                    similarity = cosine_similarity(detected_person, total_unique_persons[index])[0][0]
+                    print(similarity)
+                    if similarity > 0.6:
+                        print("SAME PERSON FOUD")
+                        newFound = False
+                        total_unique_persons[index] = detected_person #updating detetected one
+                        break
+
+                if newFound:
+                    total_unique_persons.append(detected_person)
+                    print('NEW PERSON FOUND')
+
+        return total_unique_persons
 
 def infer_on_stream(args, client):
     """
@@ -114,7 +145,11 @@ def infer_on_stream(args, client):
     ### TODO: Load the model through `infer_network` ###
     network.load_model(args.model, args.cpu_extension, args.device)
     pedestrian_input_shape = network.get_input_shape()
-    print("Model Loaded Successfully ")
+
+    networkReIdentification = Network()
+    networkReIdentification.load_model(args.model2, args.cpu_extension, args.device)
+    identification_input_shape = networkReIdentification.get_input_shape()
+    print('Models Loaded Successfully')
 
     ### TODO: Handle the input stream ###
     cap = cv2.VideoCapture(args.input)
@@ -123,6 +158,7 @@ def infer_on_stream(args, client):
 
     total_people = 0
     last_detection_time = None
+    total_unique_persons = []
     while (cap.isOpened()):
         ### TODO: Read from the video capture ###
         isAnyFrameLeft, frame = cap.read()
@@ -131,6 +167,8 @@ def infer_on_stream(args, client):
         ### TODO: Pre-process the image as needed ###
         if not isAnyFrameLeft:
             break
+        displayFrame = frame.copy()
+
         processed_frame = pre_process(frame, net_input_shape=pedestrian_input_shape)
         ### TODO: Start asynchronous inference for specified request ###
         network.exec_net(processed_frame)
@@ -149,12 +187,24 @@ def infer_on_stream(args, client):
             for detection in output[0][0]:
                 image_id, label, conf, x_min, y_min, x_max, y_max = detection
 
-                # print(str(label))
                 if conf > 0.7:
+                    # print("label " + str(label) + "imageid"+ str(image_id))
                     x_min = int(x_min * width)
                     x_max = int(x_max * width)
                     y_min = int(y_min * height)
                     y_max = int(y_max * height)
+
+                    try:
+                        if conf > 0.9:
+                            crop_person = frame[y_min:y_max, x_min:x_max]
+                            # cv2.imshow("cropped", crop_img)
+                            # cv2.waitKey(0)
+                            total_unique_persons = reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons)
+
+                    except Exception as err:
+                        print(err)
+
+
 
                     x_min_diff = last_x_min - x_min
                     x_max_diff = last_x_max - x_max
@@ -178,7 +228,7 @@ def infer_on_stream(args, client):
                     last_y_max = y_max
                     last_y_min = y_min
 
-                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+                    cv2.rectangle(displayFrame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
                     activity = ""
                     if (abs(y_min_diff) <= 20):
@@ -186,7 +236,7 @@ def infer_on_stream(args, client):
                     else:
                         activity = "Walking"
 
-                    cv2.putText(frame, activity, (x_min, y_min), cv2.FONT_HERSHEY_PLAIN, 1, (255, 50, 50),
+                    cv2.putText(displayFrame, activity, (x_min, y_min), cv2.FONT_HERSHEY_PLAIN, 1, (255, 50, 50),
                                 lineType=cv2.LINE_4, thickness=2)
 
                     last_detection_time = datetime.now()
@@ -194,18 +244,17 @@ def infer_on_stream(args, client):
 
 
                 totalPerson = "Crowd Count: " + str(counter)
-                cv2.putText(frame, totalPerson, (int(width / 4), 100), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 20, 80),
+                cv2.putText(displayFrame, totalPerson, (int(width / 4), 100), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 20, 80),
                             lineType=cv2.LINE_8, thickness=2)
 
-                cv2.putText(frame, "Totol : "+str(total_people),(100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (250, 50, 250),
+                cv2.putText(displayFrame, "Totol : "+str(len(total_unique_persons)),(100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (250, 50, 250),
                             lineType=cv2.LINE_4, thickness=2)
 
                 if last_detection_time is not None:
                     # if last_detection_time.minute
                     second_diff = (datetime.now() - last_detection_time).total_seconds()
-                    print(second_diff)
+                    # print(second_diff)
                     if second_diff >= 1:
-                        print(second_diff)
                         total_people += counter
                         last_detection_time = None
 
@@ -222,7 +271,7 @@ def infer_on_stream(args, client):
 
 
 
-        imshow("frame", frame)
+        imshow("frame", displayFrame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -244,7 +293,10 @@ def main():
     :return: None
     """
     # Grab command line args
-    args = build_argparser().parse_args()
+    args = build_argparser().parse_args(args=['-i', 'resources/Pedestrian_Detect_2_1_1.mp4',
+                                              '-m','models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml',
+                                              '-m2','models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml',
+                                              '-d', 'CPU'])
     # Connect to the MQTT server
     client = connect_mqtt()
     # Perform inference on the input stream
@@ -253,4 +305,7 @@ def main():
 
 if __name__ == '__main__':
     # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -d CPU
+    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
+    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU
+
     main()

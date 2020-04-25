@@ -1,2 +1,14 @@
 Step 1: Download Pre-Trained Pedesterian model.
         python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name pedestrian-detection-adas-0002 -o models/ --precisions FP16
+
+Step 2: Dowload ReIdentification Model
+        To remove duplication in people counter
+        python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name person-reidentification-retail-0031 -o models/ --precisions FP16
+        #THIS MODEL FAILED AS ACCURACY AROUND 77%
+
+        python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name person-reidentification-retail-0248 -o models/ --precisions FP16
+
+
+
+Command To RUN:
+     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
