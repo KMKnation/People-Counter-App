@@ -93,10 +93,6 @@ def pre_process(frame, net_input_shape):
 def imshow(name, frame):
     cv2.imshow('output', imutils.resize(frame, width=900))
 
-
-def filter_out_same_person_detecions(output):
-    print(output.shape)
-
 def reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons):
     idetification_frame = pre_process(crop_person, net_input_shape=identification_input_shape)
     networkReIdentification.exec_net(idetification_frame)
@@ -112,16 +108,16 @@ def reidentification(networkReIdentification, crop_person, identification_input_
                 detected_person = ident_output[i].reshape(1,-1)
                 for index in range(len(total_unique_persons)): #checking that detected person is in out list or not
                     similarity = cosine_similarity(detected_person, total_unique_persons[index])[0][0]
-                    print(similarity)
+                    # print(similarity)
                     if similarity > 0.6:
-                        print("SAME PERSON FOUD")
+                        # print("SAME PERSON FOUD")
                         newFound = False
                         total_unique_persons[index] = detected_person #updating detetected one
                         break
 
                 if newFound:
                     total_unique_persons.append(detected_person)
-                    print('NEW PERSON FOUND')
+                    # print('NEW PERSON FOUND')
 
         return total_unique_persons
 
@@ -149,7 +145,7 @@ def infer_on_stream(args, client):
     networkReIdentification = Network()
     networkReIdentification.load_model(args.model2, args.cpu_extension, args.device)
     identification_input_shape = networkReIdentification.get_input_shape()
-    print('Models Loaded Successfully')
+    # print('Models Loaded Successfully')
 
     ### TODO: Handle the input stream ###
     cap = cv2.VideoCapture(args.input)
@@ -157,6 +153,8 @@ def infer_on_stream(args, client):
     ### TODO: Loop until stream is over ###
 
     last_detection_time = None
+    start = None
+
     total_unique_persons = []
     while (cap.isOpened()):
         ### TODO: Read from the video capture ###
@@ -165,6 +163,7 @@ def infer_on_stream(args, client):
         height = int(cap.get(4))
         ### TODO: Pre-process the image as needed ###
         if not isAnyFrameLeft:
+            sys.stdout.flush()
             break
         displayFrame = frame.copy()
 
@@ -177,6 +176,8 @@ def infer_on_stream(args, client):
         last_x_max = 0
         last_y_max = 0
         last_y_min = 0
+
+
         if network.wait() == 0:
             inference_end_time = time.time()
             total_inference_time = str(inference_end_time - inference_start_time)
@@ -187,15 +188,17 @@ def infer_on_stream(args, client):
             ### TODO: Extract any desired stats from the results ###
             output = result['detection_out']
             counter = 0
+
             for detection in output[0][0]:
                 image_id, label, conf, x_min, y_min, x_max, y_max = detection
-
                 if conf > 0.7:
                     # print("label " + str(label) + "imageid"+ str(image_id))
                     x_min = int(x_min * width)
                     x_max = int(x_max * width)
                     y_min = int(y_min * height)
                     y_max = int(y_max * height)
+
+
 
                     try:
                         if conf > 0.9:
@@ -204,8 +207,8 @@ def infer_on_stream(args, client):
                             # cv2.waitKey(0)
                             total_unique_persons = reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons)
 
-                    except Exception as err:
-                        print(err)
+                    except: pass
+                        # print(err)
 
 
 
@@ -243,6 +246,9 @@ def infer_on_stream(args, client):
                                 lineType=cv2.LINE_4, thickness=2)
 
                     last_detection_time = datetime.now()
+                    if start is None:
+                        start = time.time()
+                        time.clock()
                     # print(total_detected)
 
                 totalPerson = "Crowd Count: " + str(counter)
@@ -259,17 +265,25 @@ def infer_on_stream(args, client):
                     # print(second_diff)
                     if second_diff >= 1:
                         last_detection_time = None
+                        start = None
 
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
             client.publish("person", json.dumps({"count": str(counter), "total": str(len(total_unique_persons))}))
             ### Topic "person/duration": key of "duration" ###
-            client.publish("person/duration", json.dumps({"duration": "00:00"}))
+            if start is not None:
+                elapsed = time.time() - start
+                client.publish("person/duration", json.dumps({"duration": elapsed}))
+            else:
+                client.publish("person/duration", json.dumps({"duration": 0}))
 
 
-            # imshow("frame", displayFrame)
-            sys.stdout.buffer.write(displayFrame)
+
+        # sys.stdout.buffer.write(displayFrame)
+
+        # imshow("frame", displayFrame)
+        # sys.stdout.buffer.write(displayFrame)
 
         ### TODO: Send the frame to the FFMPEG server ###
 
