@@ -283,7 +283,7 @@ def infer_on_stream(args, client):
         # sys.stdout.buffer.write(displayFrame)
 
         # imshow("frame", displayFrame)
-        # sys.stdout.buffer.write(displayFrame)
+        sys.stdout.buffer.write(displayFrame)
 
         ### TODO: Send the frame to the FFMPEG server ###
 
