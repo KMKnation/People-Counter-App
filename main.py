@@ -44,7 +44,6 @@ MQTT_PORT = 3001
 MQTT_KEEPALIVE_INTERVAL = 60
 
 
-
 def build_argparser():
     """
     Parse command line arguments.
@@ -93,26 +92,27 @@ def pre_process(frame, net_input_shape):
 def imshow(name, frame):
     cv2.imshow('output', imutils.resize(frame, width=900))
 
+
 def reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons):
     idetification_frame = pre_process(crop_person, net_input_shape=identification_input_shape)
     networkReIdentification.exec_net(idetification_frame)
-    if networkReIdentification.wait() == 0: #256 dimentional unique descriptor
+    if networkReIdentification.wait() == 0:  # 256 dimentional unique descriptor
         ident_output = networkReIdentification.get_output()
         for i in range(len(ident_output)):
-            if(len(total_unique_persons) == 0):
+            if (len(total_unique_persons) == 0):
                 # print(ident_output[i].reshape(1,-1).shape)
-                total_unique_persons.append(ident_output[i].reshape(1,-1))
+                total_unique_persons.append(ident_output[i].reshape(1, -1))
             else:
                 # print("Checking SIMILARITY WITH PREVIOUS PEOPLE IF THEY MATCH THEN ALTERTING PERSON COMES SECONF TIME ELSE INCREMENTING TOTAL PEOPLE")
                 newFound = True
-                detected_person = ident_output[i].reshape(1,-1)
-                for index in range(len(total_unique_persons)): #checking that detected person is in out list or not
+                detected_person = ident_output[i].reshape(1, -1)
+                for index in range(len(total_unique_persons)):  # checking that detected person is in out list or not
                     similarity = cosine_similarity(detected_person, total_unique_persons[index])[0][0]
                     # print(similarity)
                     if similarity > 0.6:
                         # print("SAME PERSON FOUD")
                         newFound = False
-                        total_unique_persons[index] = detected_person #updating detetected one
+                        total_unique_persons[index] = detected_person  # updating detetected one
                         break
 
                 if newFound:
@@ -120,6 +120,7 @@ def reidentification(networkReIdentification, crop_person, identification_input_
                     # print('NEW PERSON FOUND')
 
         return total_unique_persons
+
 
 def infer_on_stream(args, client):
     """
@@ -177,7 +178,6 @@ def infer_on_stream(args, client):
         last_y_max = 0
         last_y_min = 0
 
-
         if network.wait() == 0:
             inference_end_time = time.time()
             total_inference_time = str(inference_end_time - inference_start_time)
@@ -198,32 +198,30 @@ def infer_on_stream(args, client):
                     y_min = int(y_min * height)
                     y_max = int(y_max * height)
 
-
-
                     try:
-                        if conf > 0.9:
+                        if conf > 0.89:
                             crop_person = frame[y_min:y_max, x_min:x_max]
                             # cv2.imshow("cropped", crop_img)
                             # cv2.waitKey(0)
-                            total_unique_persons = reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons)
+                            total_unique_persons = reidentification(networkReIdentification, crop_person,
+                                                                    identification_input_shape, total_unique_persons)
 
-                    except: pass
-                        # print(err)
-
-
+                    except:
+                        pass
+                    # print(err)
 
                     x_min_diff = last_x_min - x_min
                     x_max_diff = last_x_max - x_max
 
-                    if x_min_diff  > 0 and x_max_diff > 0: #ignore multiple drawn bounding boxes
+                    if x_min_diff > 0 and x_max_diff > 0:  # ignore multiple drawn bounding boxes
                         # cv2.waitKey(0)
                         continue
 
                     y_min_diff = abs(last_y_min) - abs(y_min)
                     y_max_diff = abs(last_y_max) - abs(y_max)
 
-
                     counter = counter + 1
+
                     # print("X  => " + str(x_min_diff) + " " + str(x_max_diff) + " label" + str(label))
                     # print(" label" + str(label))
                     # print("Y  => " + str(y_min_diff) + " " + str(y_max_diff))
@@ -237,27 +235,24 @@ def infer_on_stream(args, client):
                     cv2.rectangle(displayFrame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
                     activity = ""
-                    if (abs(y_min_diff) <= 20):
-                        activity = "stayed"
+                    if (y_min_diff > -35 and y_max_diff < -377):
+                        activity = "Standing"
                     else:
                         activity = "Walking"
+                        # print("Y  => " + str(y_min_diff) + " " + str(y_max_diff))
 
-                    cv2.putText(displayFrame, activity, (x_min, y_min), cv2.FONT_HERSHEY_PLAIN, 1, (255, 50, 50),
+                    cv2.putText(displayFrame, activity, (x_max, y_min + 50), cv2.FONT_HERSHEY_PLAIN, 1, (255, 50, 50),
                                 lineType=cv2.LINE_4, thickness=2)
 
                     last_detection_time = datetime.now()
+                    # print(total_detected)
                     if start is None:
                         start = time.time()
                         time.clock()
-                    # print(total_detected)
 
-                totalPerson = "Crowd Count: " + str(counter)
-                cv2.putText(displayFrame, totalPerson, (50,100), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 20, 80),
-                            lineType=cv2.LINE_4, thickness=2)
-
-                cv2.putText(displayFrame, "Totol : "+str(len(total_unique_persons)),(50,150),
-                            cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
-                            lineType=cv2.LINE_4, thickness=2)
+                # cv2.putText(displayFrame, "Totol Unique Persons: " + str(len(total_unique_persons)), (50, 150),
+                #             cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
+                #             lineType=cv2.LINE_4, thickness=2)
 
                 if last_detection_time is not None:
                     # if last_detection_time.minute
@@ -270,15 +265,12 @@ def infer_on_stream(args, client):
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
             ### Topic "person": keys of "count" and "total" ###
-            client.publish("person", json.dumps({"count": str(counter), "total": str(len(total_unique_persons))}))
+            client.publish("person", json.dumps({"count": str(counter), "total": len(total_unique_persons)}))
             ### Topic "person/duration": key of "duration" ###
+
             if start is not None:
                 elapsed = time.time() - start
                 client.publish("person/duration", json.dumps({"duration": elapsed}))
-            else:
-                client.publish("person/duration", json.dumps({"duration": 0}))
-
-
 
         # sys.stdout.buffer.write(displayFrame)
 
@@ -294,7 +286,6 @@ def infer_on_stream(args, client):
             break
 
 
-
 def main():
     """
     Load the network and parse the output.
@@ -303,8 +294,10 @@ def main():
     """
     # Grab command line args
     args = build_argparser().parse_args(args=['-i', 'resources/Pedestrian_Detect_2_1_1.mp4',
-                                              '-m','models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml',
-                                              '-m2','models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml',
+                                              '-m',
+                                              'models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml',
+                                              '-m2',
+                                              'models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml',
                                               '-d', 'CPU'])
     # Connect to the MQTT server
     client = connect_mqtt()
