@@ -6,9 +6,38 @@ questions.
 
 ## Explaining Custom Layers
 
+
 The process behind converting custom layers involves...
 
+Ans: 
+
+There are diffrent processes for converting custom layers depending on the framework.
+
+For Caffe:
+1. Register custom layer as extension in model optimizer OR
+2. Register custom layer as Custom and use system's caffe to calculate the output shape of each Custom Layer
+
+For Tensorflow:
+1. Register custom layer as extension in model optimizer OR
+2. You need some sub graph that shoud not be in IR and also have another subgraph for that operation. Model Optimizer provides such solution as "Sub Graph Replacement" OR
+3. Pass the custom operation to Tensorflow to handle during inference.
+
+For MXNet:
+1. MXNet's process is same as tensorflow one. It only not supporting the offloading the custom layer to MXNet to handle.
+
 Some of the potential reasons for handling custom layers are...
+
+Ans: 
+
+The Custom layes known as per their name "Custom" means modified or new. 
+There are variety of frameworks which are used for training the deep learning models such as <i>Keras, Tensorflow, ONNX, Caffe etc.</i>
+
+All these frameworks have their own methods to process the tensors (Data) so it may possible that
+some functions are not available or behaves diffrently in each other.
+
+Model Optimizer query each layer of trained model from the list of known layers (Supported layers) before building the model's internal representation.
+It also optimizes the model by following three steps. Quantization, Freezing and Fusing. At last it generated the intermidiate representation from the trained model. 
+
 
 ## Comparing Model Performance
 
