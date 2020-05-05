@@ -65,36 +65,23 @@ inference time  | 3528.266 ms  | 36.44 ms
 ## Assess Model Use Cases
 
 Some of the potential use cases of the people counter app are...
+1. Automate Room Counting
+2. Live Audience Statistics
+3. Pantry or Canteen space counting
+4. Crowd Detection (specifically right now for Covid-19)
+5. Security Systems
 
 Each of these use cases would be useful because...
+1. Automate Room Counting - This will helps the house owners who rent their house/PG, They can get to know about the people gathering in their house on daily basis.
+2. Live Audience Statistics - In event management companies, counting each person is very assumption based task so each output is approx and diffrent with other narrators. With this solution, they only need to process CCTV footage and produce the actual statistics.
+3. Pantry or Canteen space counting - In our company, there are many canteens but the problem is that it is occupied everytime whenever i go there. So if i integrate this solution in my company then i can able to know when to go in canteen :D
+4. Crowd Detection -  Right now in India, there are many people who are not understanding the current situation that how crucial it is and we have to stay at home, but some people ignoring this going out for chill in name of essential buying, So i think to detect the large crowd gathering in this time is one of the best application.
+5. Security Systems - To provide the statistics to building owner that how many people comes in and how many gets out.
 
 ## Assess Effects on End User Needs
 
 Lighting, model accuracy, and camera focal length/image size have different effects on a
 deployed edge model. The potential effects of each of these are as follows...
-
-## Model Research
-
-[This heading is only required if a suitable model was not found after trying out at least three
-different models. However, you may also use this heading to detail how you converted 
-a successful model.]
-
-In investigating potential people counter models, I tried each of the following three models:
-
-- Model 1: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-  
-- Model 2: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-
-- Model 3: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
+- In bad light, model sometimes not detecting the person so to solve this we need to either keeping one light on with th Camera or need to build one robust model from scratch.
+- Model Accuracy is also a vital part for some cases, specifically in concern to security. If end user agrees whith the lower accuracy and happy with the results and speed then it is best option to use openvino.
+- Camera focal length/Image Size. Camera focal length is one of the important parameter to get the desired results without it model can not detect the person if he/she is so far from camera.
