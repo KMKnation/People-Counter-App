@@ -43,12 +43,24 @@ It also optimizes the model by following three steps. Quantization, Freezing and
 
 My method(s) to compare models before and after conversion to Intermediate Representations
 were...
+- Comparing the size of both models
+- Comparing the accuracy of models
+- Comparing the inference time of both models
+
+Please checkout the <i>model_comparison.py</i> at {LINK} that does the above things.
 
 The difference between model accuracy pre- and post-conversion was...
 
 The size of the model pre- and post-conversion was...
 
 The inference time of the model pre- and post-conversion was...
+
+Parameters | pre-conversion | post-conversion
+| ------------- | ------------- | -------------
+accuracy  | 0.65138817  | 0.6267369
+size  | 69.7 MB  | 67.3 MB
+inference time  | 3528.266 ms  | 36.44 ms
+
 
 ## Assess Model Use Cases
 

@@ -1,14 +1,27 @@
+Step 1: Download tensorflow pre-trained model from https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md
+Step 2: Install Tensorflow Prerequisites
+        ./opt/intel/openvino/deployment_tools/model_optimizer/install_prerequisites/install_prerequisites_tf.sh
+Step 2: Convert the SSD MobileNet V2 model from TensorFlow
+        cd models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/
+        python /opt/intel/openvino/deployment_tools/model_optimizer/mo.py --input_model frozen_inference_graph.pb --tensorflow_object_detection_api_pipeline_config pipeline.config --reverse_input_channels --tensorflow_use_custom_operations_config /opt/intel/openvino/deployment_tools/model_optimizer/extensions/front/tf/ssd_v2_support.json
+
+
+
+||| Integrating pre-generated IR provided by intel |||
+
 Step 1: Download Pre-Trained Pedesterian model.
         python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name pedestrian-detection-adas-0002 -o models/ --precisions FP16
 
 Step 2: Dowload ReIdentification Model
         To remove duplication in people counter
         python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name person-reidentification-retail-0031 -o models/ --precisions FP16
-        #THIS MODEL FAILED AS ACCURACY AROUND 77%
-
+        OR
         python /opt/intel/openvino/deployment_tools/tools/model_downloader/downloader.py --name person-reidentification-retail-0248 -o models/ --precisions FP16
 
 
 
-Command To RUN:
-     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
+Command To RUN with pre-trained models:
+     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432  -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+
+Command to RUN with converted models:
+     python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU -pt 0.10 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
