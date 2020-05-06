@@ -35,6 +35,8 @@ There are variety of frameworks which are used for training the deep learning mo
 All these frameworks have their own methods to process the tensors (Data) so it may possible that
 some functions are not available or behaves diffrently in each other.
 
+Hence Custom Layer support neccessary for Model Optimizer so that the unsupported operations can be supported through dependent framework during runtime inference.
+
 Model Optimizer query each layer of trained model from the list of known layers (Supported layers) before building the model's internal representation.
 It also optimizes the model by following three steps. Quantization, Freezing and Fusing. At last it generated the intermidiate representation from the trained model. 
 
