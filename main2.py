@@ -353,13 +353,6 @@ def main():
     :return: None
     """
     # Grab command line args
-    # args = build_argparser().parse_args(args=['-i', 'resources/Pedestrian_Detect_2_1_1.mp4',
-    # args = build_argparser().parse_args(args=['-i', '/home/mayur/Desktop/multiple/multiple.mp4',
-    #                                           '-m',
-    #                                           'models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml',
-    #                                           '-m2',
-    #                                           'models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml',
-    #                                           '-d', 'CPU'])
     args = build_argparser().parse_args()
     # Connect to the MQTT server
     client = connect_mqtt()
