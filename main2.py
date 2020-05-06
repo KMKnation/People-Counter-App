@@ -43,6 +43,7 @@ MQTT_HOST = IPADDRESS
 MQTT_PORT = 3001
 MQTT_KEEPALIVE_INTERVAL = 60
 
+EXTENSIONS = ['mp4', 'avi', 'jpeg', 'png']
 
 def build_argparser():
     """
@@ -195,6 +196,11 @@ def infer_on_stream(args, client):
     networkReIdentification.load_model(args.model2, args.cpu_extension, args.device)
     identification_input_shape = networkReIdentification.get_input_shape()
     # print('Models Loaded Successfully')
+
+    #checking that input stream is are in supported extensions
+    if not args.input.split('.')[1] in EXTENSIONS:
+        print("The input file is not supported yet")
+        exit(1)
 
     ### TODO: Handle the input stream ###
     cap = cv2.VideoCapture(args.input)
