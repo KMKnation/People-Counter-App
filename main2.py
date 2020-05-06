@@ -308,9 +308,9 @@ def infer_on_stream(args, client):
                                     lineType=cv2.LINE_8, thickness=1)
 
 
-                cv2.putText(displayFrame, "Totol Unique Persons: "+str(len(total_unique_persons)),(50,150),
-                            cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
-                            lineType=cv2.LINE_4, thickness=2)
+                # cv2.putText(displayFrame, "Totol Unique Persons: "+str(len(total_unique_persons)),(50,150),
+                #             cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
+                #             lineType=cv2.LINE_4, thickness=2)
 
                 if start is not None and counter == 0:
                     elapsed = time.time() - start
