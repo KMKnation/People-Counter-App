@@ -21,7 +21,8 @@ Step 2: Dowload ReIdentification Model
 
 
 Command To RUN with pre-trained models:
-     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432  -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+     python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432  -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
 
 Command to RUN with converted models:
-     python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU -pt 0.10 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU -pt 0.10 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+     python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU -pt 0.10 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm

@@ -29,6 +29,7 @@ import json
 import cv2
 from imutils.video import FPS
 from datetime import datetime
+import logging as log
 import paho.mqtt.client as mqtt
 
 from argparse import ArgumentParser
@@ -66,7 +67,7 @@ def build_argparser():
                              "CPU, GPU, FPGA or MYRIAD is acceptable. Sample "
                              "will look for a suitable plugin for device "
                              "specified (CPU by default)")
-    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.3,
+    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
                         help="Probability threshold for detections filtering"
                              "(0.5 by default)")
 
@@ -91,6 +92,54 @@ def pre_process(frame, net_input_shape):
 def imshow(name, frame):
     cv2.imshow('output', imutils.resize(frame, width=900))
 
+total = []
+import numpy as np
+def itenfy_new_person(network, crop, shape, conf):
+    processed = pre_process(crop, net_input_shape=shape)
+    network.exec_net(processed)
+    if network.wait() == 0:  # 256 dimentional unique descriptor
+        ident_output = network.get_output()
+        for i in range(len(ident_output)):
+            latesr_person_embeddings = ident_output[i].reshape(1, -1)
+            if (len(total) == 0):
+                total.append([latesr_person_embeddings])
+            else:
+                similarities = []
+                for k in range(len(total)):
+                    person_similarities = []
+                    for person in total[k]:
+                        person_similarities.append(cosine_similarity(latesr_person_embeddings, person)[0][0])
+
+                    similarities.append(person_similarities)
+
+                if(len(similarities) < 2):
+                    if(np.max(similarities[0]) > 0.65 and np.mean(similarities[0]) > 0.30):
+                        # if len(total[0]) > 20: #keeping only latest 20 frames
+                        #     # total[0] = total[0][1:21]
+
+                        total[0].append(latesr_person_embeddings)
+                    else:
+                        total.append([latesr_person_embeddings]) #adding as new person
+                else:
+
+                    shouldAdd = True
+                    #check is there any cluster which has more similarities
+                    for index in range(len(total)):
+                        if(np.max(similarities[index]) > 0.65 and np.mean(similarities[index]) > 0.30):
+                            # if len(total[index]) > 20: #keeping only latest 20 frames
+                            #     total[index] = total[index][1:21]
+
+                            total[index].append(latesr_person_embeddings)
+                            shouldAdd = False
+                            break
+
+                    if shouldAdd:
+                        total.append([latesr_person_embeddings]) #adding as new person
+
+
+    return
+
+
 def reidentification(networkReIdentification, crop_person, identification_input_shape, total_unique_persons, conf):
     idetification_frame = pre_process(crop_person, net_input_shape=identification_input_shape)
     networkReIdentification.exec_net(idetification_frame)
@@ -109,15 +158,15 @@ def reidentification(networkReIdentification, crop_person, identification_input_
                     # print(similarity)
                     if similarity > 0.65: #0.58
                         # print("SAME PERSON FOUD")
-                        # print(str(similarity) + "at "+str(index))
+                        print(str(similarity) + "at "+str(index))
                         newFound = False
                         total_unique_persons[index] = detected_person  # updating detetected one
                         break
 
                 if newFound and conf > 0.90:
                     total_unique_persons.append(detected_person)
-                    # print('NEW PERSON FOUND')
-        # print(len(total_unique_persons))
+                    print('NEW PERSON FOUND')
+        print(len(total_unique_persons))
         return total_unique_persons
 
 
@@ -136,7 +185,7 @@ def infer_on_stream(args, client):
     if not args.prob_threshold is None:
         prob_threshold = args.prob_threshold
     else:
-        prob_threshold = 0.3
+        prob_threshold = 0.4
 
     ### TODO: Load the model through `infer_network` ###
     network.load_model(args.model, args.cpu_extension, args.device)
@@ -180,22 +229,17 @@ def infer_on_stream(args, client):
         if network.wait() == 0:
             inference_end_time = time.time()
             total_inference_time = inference_end_time - inference_start_time
-            cv2.putText(displayFrame, "Inference time: " + str(round(total_inference_time * 1000, 3)) + "ms", (5, 15),
-                        cv2.FONT_HERSHEY_PLAIN, 0.9, (230, 50, 2),
-                        lineType=cv2.LINE_8, thickness=1)
-
             # print("Inference Time "+ total_inference_time)
             ### TODO: Get the results of the inference request ###
             result = network.get_all_output()
 
             ### TODO: Extract any desired stats from the results ###
-            output = result['DetectionOutput']
+            output = result['detection_out']
             counter = 0
 
             for detection in output[0][0]:
                 image_id, label, conf, x_min, y_min, x_max, y_max = detection
-
-                if conf > prob_threshold:
+                if conf > 0.7:
                     # print("label " + str(label) + "imageid"+ str(image_id))
                     x_min = int(x_min * width)
                     x_max = int(x_max * width)
@@ -205,11 +249,14 @@ def infer_on_stream(args, client):
                     try:
                         if conf > 0.85:
                             crop_person = frame[y_min:y_max, x_min:x_max]
+                            # cv2.imshow("cropped", crop_img)
+                            # cv2.waitKey(0)
                             total_unique_persons = reidentification(networkReIdentification, crop_person,
                                                                     identification_input_shape, total_unique_persons, conf)
+                            # itenfy_new_person(networkReIdentification, crop_person, identification_input_shape, conf)
 
                     except Exception as err:
-                        # print(err)
+                        print(err)
                         pass
                     # print(err)
 
@@ -221,9 +268,15 @@ def infer_on_stream(args, client):
                         continue
 
                     y_min_diff = abs(last_y_min) - abs(y_min)
+                    y_max_diff = abs(last_y_max) - abs(y_max)
 
                     counter = counter + 1
 
+                    # print("X  => " + str(x_min_diff) + " " + str(x_max_diff) + " label" + str(label))
+                    # print(" label" + str(label))
+                    # print("Y  => " + str(y_min_diff) + " " + str(y_max_diff))
+
+                    # print(str(y_min_diff)+ " " + str(y_max_diff))
                     last_x_min = x_min
                     last_x_max = x_max
                     last_y_max = y_max
@@ -250,28 +303,27 @@ def infer_on_stream(args, client):
                         start = time.time()
                         time.clock()
 
+                cv2.putText(displayFrame, "Inference time: " + str(round(total_inference_time * 1000, 3)) + "ms", (5, 15),
+                                    cv2.FONT_HERSHEY_PLAIN, 0.9, (230, 50, 2),
+                                    lineType=cv2.LINE_8, thickness=1)
 
-                # cv2.putText(displayFrame, "Totol Unique Persons: "+str(len(total_unique_persons)),(50,150),
-                #             cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
-                #             lineType=cv2.LINE_4, thickness=2)
 
-                # if start is not None and counter == 0:
-                #     elapsed = time.time() - start
-                #     client.publish("person/duration", json.dumps({"duration": elapsed}))
-                #     start = None
+                cv2.putText(displayFrame, "Totol Unique Persons: "+str(len(total_unique_persons)),(50,150),
+                            cv2.FONT_HERSHEY_COMPLEX, 1, (100, 150, 250),
+                            lineType=cv2.LINE_4, thickness=2)
 
-                if last_detection_time is not None:
-                    # if last_detection_time.minute
-                    second_diff = (datetime.now() - last_detection_time).total_seconds()
-                    # print(second_diff)
-                    if second_diff >= 1.5:
-                        if start is not None:
-                            elapsed = time.time() - start
-                            client.publish("person/duration", json.dumps({"duration": elapsed - second_diff}))
-                            # start = None
-                            last_detection_time = None
-                            start = None
+                if start is not None and counter == 0:
+                    elapsed = time.time() - start
+                    client.publish("person/duration", json.dumps({"duration": elapsed}))
+                    start = None
 
+                # if last_detection_time is not None:
+                #     # if last_detection_time.minute
+                #     second_diff = (datetime.now() - last_detection_time).total_seconds()
+                #     # print(second_diff)
+                #     if second_diff >= 1:
+                #         last_detection_time = None
+                #         start = None
 
             ### TODO: Calculate and send relevant information on ###
             ### current_count, total_count and duration to the MQTT server ###
@@ -283,6 +335,7 @@ def infer_on_stream(args, client):
         sys.stdout.buffer.write(displayFrame)
         #
         # imshow("frame", displayFrame)
+        # sys.stdout.buffer.write(displayFrame)
 
         ### TODO: Send the frame to the FFMPEG server ###
 
@@ -301,12 +354,12 @@ def main():
     """
     # Grab command line args
     # args = build_argparser().parse_args(args=['-i', 'resources/Pedestrian_Detect_2_1_1.mp4',
+    # args = build_argparser().parse_args(args=['-i', '/home/mayur/Desktop/multiple/multiple.mp4',
     #                                           '-m',
-    #                                           'models/tensorflow/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml',
+    #                                           'models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml',
     #                                           '-m2',
     #                                           'models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml',
     #                                           '-d', 'CPU'])
-
     args = build_argparser().parse_args()
     # Connect to the MQTT server
     client = connect_mqtt()
@@ -315,9 +368,9 @@ def main():
 
 
 if __name__ == '__main__':
-    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -d CPU
-    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
-    # python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU
+    # python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -d CPU
+    # python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0031/FP16/person-reidentification-retail-0031.xml -d CPU
+    # python main2.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m models/intel/pedestrian-detection-adas-0002/FP16/pedestrian-detection-adas-0002.xml -m2 models/intel/person-reidentification-retail-0248/FP16/person-reidentification-retail-0248.xml -d CPU
     # ffmpeg -f lavfi -i color=c=black:s=1280x720 -vframes 1 black.png
     # ffmpeg -f lavfi -i color=c=black:s=1280x720 -vframes 1 black.png
     # ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -vframes -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
