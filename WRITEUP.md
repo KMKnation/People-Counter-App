@@ -49,7 +49,7 @@ were...
 - Comparing the accuracy of models
 - Comparing the inference time of both models
 
-Please checkout the <i>model_comparison.py</i> at {LINK} that does the above things.
+Please checkout the [model_comparison.py](./model_comparison.py) that does the above things.
 
 The difference between model accuracy pre- and post-conversion was...
 
